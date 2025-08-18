@@ -1,0 +1,8 @@
+node_modules
+npm-debug.log
+.DS_Store
+.env
+.env.*
+uploads/*        # optional: you might mount this path in K8s instead
+coverage
+.git

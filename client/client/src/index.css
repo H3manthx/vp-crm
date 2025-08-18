@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { background: transparent; }
+
+/* ---------- App mount fade (kept) ---------- */
+.app-fade { opacity:0; transform: translateY(6px); transition: opacity .85s ease, transform .85s ease; }
+.app-fade.ready { opacity:1; transform: translateY(0); }
+
+/* ---------- Splash: interactive logo ---------- */
+.splash-logo3d{
+  width: min(150px, 24vw);
+  height: auto;
+  opacity: .98;
+  transform:
+    translateZ(0)
+    rotateX(var(--rx, 0deg))
+    rotateY(var(--ry, 0deg))
+    scale(1);
+  transition: transform .12s ease-out, filter .3s ease;
+  filter: drop-shadow(0 10px 26px rgba(0,0,0,.38));
+  animation: splash-pop .7s cubic-bezier(.2,.75,.2,1.05) both;
+  will-change: transform, filter;
+}
+@keyframes splash-pop {
+  from { opacity:0; transform: translateZ(0) rotateX(0) rotateY(0) scale(.86) }
+  to   { opacity:1; transform: translateZ(0) rotateX(0) rotateY(0) scale(1) }
+}
+.splash-spin-once { animation: splash-spin 700ms ease-out 1; }
+@keyframes splash-spin { from { transform: rotateZ(0) } to { transform: rotateZ(360deg) } }
+
+/* Glossy sweep that passes over the logo */
+.splash-shine{
+  position:absolute; inset:0; pointer-events:none; mix-blend-mode:screen; opacity:.0;
+  background: linear-gradient(100deg,
+    rgba(255,255,255,0) 20%,
+    rgba(255,255,255,.22) 45%,
+    rgba(255,255,255,0) 72%);
+  transform: translateX(-140%);
+  animation: splash-shine-move 1.8s ease-out .4s forwards;
+  filter: blur(1px);
+}
+@keyframes splash-shine-move {
+  0% { opacity:0; transform: translateX(-140%) }
+  10%{ opacity:.65 }
+  70%{ opacity:.65 }
+  100% { opacity:0; transform: translateX(140%) }
+}
+
+/* Orbiting dots */
+.splash-orbit{
+  position:absolute; border-radius:999px; pointer-events:none; filter: blur(6px);
+}
+.splash-orbit--a{
+  width: 8px; height: 8px; background: rgba(255,255,255,.35);
+  animation: orbit-a 16s linear infinite;
+}
+.splash-orbit--b{
+  width: 6px; height: 6px; background: rgba(255,255,255,.28);
+  animation: orbit-b 20s linear infinite;
+}
+.splash-orbit--c{
+  width: 10px; height: 10px; background: rgba(255,255,255,.22);
+  animation: orbit-c 24s linear infinite;
+}
+@keyframes orbit-a {
+  0%   { transform: translate(-120px, -20px) }
+  25%  { transform: translate(  40px, -90px) }
+  50%  { transform: translate( 140px,   0px) }
+  75%  { transform: translate(  10px,  90px) }
+  100% { transform: translate(-120px, -20px) }
+}
+@keyframes orbit-b {
+  0%   { transform: translate(120px, 20px) }
+  25%  { transform: translate(-40px, 90px) }
+  50%  { transform: translate(-150px, 0px) }
+  75%  { transform: translate(-10px, -100px) }
+  100% { transform: translate(120px, 20px) }
+}
+@keyframes orbit-c {
+  0%   { transform: translate(0px, -140px) }
+  25%  { transform: translate(110px, 10px) }
+  50%  { transform: translate(0px, 140px) }
+  75%  { transform: translate(-110px, -10px) }
+  100% { transform: translate(0px, -140px) }
+}
+
+/* Reduced motion: keep it classy, but calm */
+@media (prefers-reduced-motion: reduce){
+  .splash-logo3d,
+  .splash-shine,
+  .splash-orbit,
+  .splash-spin-once { animation: none !important }
+  .splash-logo3d { transform: scale(1) !important }
+}
+
+/* Hide number input spinners (Chrome, Edge, Safari) */
+input[type="number"].no-spin::-webkit-outer-spin-button,
+input[type="number"].no-spin::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Hide number input spinners (Firefox) */
+input[type="number"].no-spin {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+

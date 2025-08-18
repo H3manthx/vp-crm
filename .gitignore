@@ -1,0 +1,21 @@
+# root
+.git/
+**/*.log
+.env
+.env.*
+!.env.example
+
+# server
+server/node_modules/
+server/uploads/
+server/npm-debug.log
+
+# client
+client/node_modules/
+client/dist/
+client/npm-debug.log
+
+# misc
+**/.cache/
+.DS_Store
+Thumbs.db
