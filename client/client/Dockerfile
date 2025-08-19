@@ -4,15 +4,18 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-
-# Vite reads env at build time:
-# You'll pass VITE_API_BASE_URL when building (see commands below).
+# Vite reads env at build time (from .env.production in repo)
 RUN npm run build
 
-# ---- Serve with Nginx ----
+# ---- Serve with Nginx, listen on $PORT ----
 FROM nginx:alpine
-# Minimal SPA config with history fallback
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# We'll generate the nginx config at container start using $PORT
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx","-g","daemon off;"]
+
+# Default (Cloud Run sets PORT anyway)
+ENV PORT=8080
+
+EXPOSE 8080
+# Render template -> default.conf, then start nginx
+CMD ["/bin/sh","-c","envsubst '$$PORT' </etc/nginx/templates/default.conf.template >/etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
