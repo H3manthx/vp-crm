@@ -3,6 +3,13 @@ FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
+
+# build-time inputs from Cloud Build Trigger
+ARG VITE_API_URL
+ARG VITE_FILE_BASE
+ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_FILE_BASE=${VITE_FILE_BASE}
+
 COPY . .
 # Vite reads env at build time (from .env.production in repo)
 RUN npm run build
