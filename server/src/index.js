@@ -8,19 +8,6 @@ import { fileURLToPath } from 'url';
 
 import { buildCors } from './cors.js';
 
-import { authRouter } from './routes/auth.js';
-import { retailRouter } from './routes/retail.js';
-import { corporateRouter } from './routes/corporate.js';
-import { employeesRouter } from './routes/employees.js';
-import { remindersRouter } from './routes/reminders.js';
-import { storesRouter } from './routes/stores.js';
-import { corporateQuotesRouter } from './routes/corporateQuotes.js';
-import { corporateProposalsRouter } from './routes/corporateProposals.js';
-import { startReminderJobs } from './services/reminders.js';
-
-// If export.js default-exports the router:
-import exportRouter from './routes/export.js'; // else:  import { exportRouter } from './routes/export.js';
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -44,7 +31,22 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 // Static
 app.use('/uploads', express.static(path.resolve(__dirname, '..', 'uploads')));
 
-// Helper to find the bad router quickly
+// Helpers to find the culprit fast
+async function importOrDie(spec, name) {
+  try {
+    console.log(`[BOOT] Importing ${name} from ${spec}`);
+    const mod = await import(spec);
+    console.log(`[BOOT] Imported ${name}`);
+    return mod;
+  } catch (e) {
+    console.error(`[BOOT][FATAL] Import failed for ${name} (${spec})`);
+    console.error(e?.stack || e);
+    process.exit(1);
+  }
+}
+function pickRouter(mod, named) {
+  return mod?.default ?? mod?.[named];
+}
 function mountOrDie(prefix, name, router) {
   try {
     console.log(`[BOOT] Mounting ${name} at ${prefix}`);
@@ -53,28 +55,49 @@ function mountOrDie(prefix, name, router) {
   } catch (e) {
     console.error(`[BOOT][FATAL] Failed mounting ${name} at ${prefix}`);
     console.error(e?.stack || e);
-    // Exit so Cloud Run logs show this clearly
     process.exit(1);
   }
 }
 
-// Mount routers (the log before the crash = culprit next)
-mountOrDie('/api/auth', 'authRouter', authRouter);
-mountOrDie('/api/retail', 'retailRouter', retailRouter);
-mountOrDie('/api/corporate', 'corporateRouter', corporateRouter);
-mountOrDie('/api/employees', 'employeesRouter', employeesRouter);
-mountOrDie('/api/reminders', 'remindersRouter', remindersRouter);
-mountOrDie('/api/stores', 'storesRouter', storesRouter);
-mountOrDie('/api/corporate/leads/quotes', 'corporateQuotesRouter', corporateQuotesRouter);
-mountOrDie('/api/corporate/leads/proposals', 'corporateProposalsRouter', corporateProposalsRouter);
-mountOrDie('/api', 'exportRouter', exportRouter);
+// ---- Dynamically import & mount routers (any bad path will be isolated) ----
+const authMod = await importOrDie('./routes/auth.js', 'authRouter');
+mountOrDie('/api/auth', 'authRouter', pickRouter(authMod, 'authRouter'));
 
+const retailMod = await importOrDie('./routes/retail.js', 'retailRouter');
+mountOrDie('/api/retail', 'retailRouter', pickRouter(retailMod, 'retailRouter'));
+
+const corporateMod = await importOrDie('./routes/corporate.js', 'corporateRouter');
+mountOrDie('/api/corporate', 'corporateRouter', pickRouter(corporateMod, 'corporateRouter'));
+
+const employeesMod = await importOrDie('./routes/employees.js', 'employeesRouter');
+mountOrDie('/api/employees', 'employeesRouter', pickRouter(employeesMod, 'employeesRouter'));
+
+const remindersMod = await importOrDie('./routes/reminders.js', 'remindersRouter');
+mountOrDie('/api/reminders', 'remindersRouter', pickRouter(remindersMod, 'remindersRouter'));
+
+const storesMod = await importOrDie('./routes/stores.js', 'storesRouter');
+mountOrDie('/api/stores', 'storesRouter', pickRouter(storesMod, 'storesRouter'));
+
+const quotesMod = await importOrDie('./routes/corporateQuotes.js', 'corporateQuotesRouter');
+mountOrDie('/api/corporate/leads/quotes', 'corporateQuotesRouter', pickRouter(quotesMod, 'corporateQuotesRouter'));
+
+const proposalsMod = await importOrDie('./routes/corporateProposals.js', 'corporateProposalsRouter');
+mountOrDie('/api/corporate/leads/proposals', 'corporateProposalsRouter', pickRouter(proposalsMod, 'corporateProposalsRouter'));
+
+const exportMod = await importOrDie('./routes/export.js', 'exportRouter');
+mountOrDie('/api', 'exportRouter', pickRouter(exportMod, 'exportRouter'));
+
+// ----- Boot -----
 const port = Number(process.env.PORT) || 8080;
 app.listen(port, '0.0.0.0', () => {
   console.log(`API listening on ${port}`);
-  startReminderJobs();
+  // Lazy import to avoid crashing boot if your jobs depend on DB
+  import('./services/reminders.js')
+    .then(({ startReminderJobs }) => startReminderJobs?.())
+    .catch(err => console.error('[BOOT] Failed to start reminder jobs', err));
 });
 
+// Make fatal reasons visible
 process.on('unhandledRejection', err => {
   console.error('UNHANDLED REJECTION', err);
   process.exit(1);
