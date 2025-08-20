@@ -7,8 +7,8 @@ RUN npm ci
 # build-time inputs (must be BEFORE npm run build)
 ARG VITE_API_URL
 ARG VITE_FILE_BASE
-ENV VITE_API_URL=${VITE_API_URL}
-ENV VITE_FILE_BASE=${VITE_FILE_BASE}
+ENV VITE_API_URL=https://vp-crm-231901109740.asia-south1.run.app/api
+ENV VITE_FILE_BASE=https://vp-crm-231901109740.asia-south1.run.app/app
 
 COPY . .
 RUN npm run build
