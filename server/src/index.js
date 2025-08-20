@@ -27,7 +27,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Cloud Run sits behind a proxy; this ensures correct protocol/origin handling
+// Cloud Run sits behind a proxy; ensure correct protocol/origin handling
 app.set('trust proxy', 1);
 
 // ----- CORS must be FIRST and must handle OPTIONS for every path -----
@@ -40,7 +40,8 @@ app.use(express.json());
 app.use(helmet());
 app.use(morgan('dev'));
 
-// Simple health check
+// Simple roots for health checks
+app.get('/', (_req, res) => res.status(200).send('ok'));
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // Static uploads
@@ -57,9 +58,20 @@ app.use('/api/corporate/leads/quotes', corporateQuotesRouter);
 app.use('/api/corporate/leads/proposals', corporateProposalsRouter);
 app.use('/api', exportRouter);
 
-// Boot
-const port = process.env.PORT || 4000;
-app.listen(port, () => {
-  console.log(`API running on http://localhost:${port}`);
+// ----- Boot -----
+const port = Number(process.env.PORT) || 8080;
+// Bind to 0.0.0.0 so Cloud Run can reach it
+app.listen(port, '0.0.0.0', () => {
+  console.log(`API listening on ${port}`);
   startReminderJobs();
+});
+
+// Surface hard failures in logs
+process.on('unhandledRejection', err => {
+  console.error('UNHANDLED REJECTION', err);
+  process.exit(1);
+});
+process.on('uncaughtException', err => {
+  console.error('UNCAUGHT EXCEPTION', err);
+  process.exit(1);
 });
