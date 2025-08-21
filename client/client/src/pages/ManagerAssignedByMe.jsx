@@ -69,8 +69,8 @@ export default function ManagerAssignedByMe() {
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState([])
 
-  // transfer overlay
-  the [showTransfer, setShowTransfer] = useState(false)
+  // transfer overlay (FIXED: removed stray 'the')
+  const [showTransfer, setShowTransfer] = useState(false)
   const [transferTo, setTransferTo] = useState('')
   const [transferReason, setTransferReason] = useState('')
   const transferSelectRef = useRef(null)
