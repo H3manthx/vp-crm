@@ -17,6 +17,8 @@ app.set('trust proxy', 1);
 // ----- CORS first -----
 const corsMw = buildCors();
 app.use(corsMw);
+// Express 5: don't use "*" — use a real pattern or omit this line
+app.options('/(.*)', corsMw);
 
 // Common middleware
 app.use(express.json());
@@ -30,7 +32,7 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 // Static
 app.use('/uploads', express.static(path.resolve(__dirname, '..', 'uploads')));
 
-// Helpers to find the culprit fast
+// Helpers
 async function importOrDie(spec, name) {
   try {
     console.log(`[BOOT] Importing ${name} from ${spec}`);
@@ -43,11 +45,27 @@ async function importOrDie(spec, name) {
     process.exit(1);
   }
 }
+
+// Unwrap ESM/CJS consistently: prefer a router function
 function pickRouter(mod, named) {
-  return mod?.default ?? mod?.[named];
+  // CJS via ESM import => { default: { named: router } }
+  if (mod?.default && typeof mod.default === 'object' && mod.default[named]) {
+    return mod.default[named];
+  }
+  // CJS default is directly the router (rare)
+  if (mod?.default && typeof mod.default === 'function') {
+    return mod.default;
+  }
+  // Proper ESM named export
+  if (mod?.[named]) return mod[named];
+  throw new Error(`Router "${named}" not found in imported module`);
 }
+
 function mountOrDie(prefix, name, router) {
   try {
+    if (typeof router !== 'function') {
+      throw new TypeError(`Expected middleware function for ${name}, got ${typeof router}`);
+    }
     console.log(`[BOOT] Mounting ${name} at ${prefix}`);
     app.use(prefix, router);
     console.log(`[BOOT] Mounted ${name}`);
@@ -58,7 +76,7 @@ function mountOrDie(prefix, name, router) {
   }
 }
 
-// ---- Dynamically import & mount routers (any bad path will be isolated) ----
+// ---- Import & mount routers ----
 const authMod = await importOrDie('./routes/auth.js', 'authRouter');
 mountOrDie('/api/auth', 'authRouter', pickRouter(authMod, 'authRouter'));
 
@@ -90,18 +108,10 @@ mountOrDie('/api', 'exportRouter', pickRouter(exportMod, 'exportRouter'));
 const port = Number(process.env.PORT) || 8080;
 app.listen(port, '0.0.0.0', () => {
   console.log(`API listening on ${port}`);
-  // Lazy import to avoid crashing boot if your jobs depend on DB
   import('./services/reminders.js')
     .then(({ startReminderJobs }) => startReminderJobs?.())
     .catch(err => console.error('[BOOT] Failed to start reminder jobs', err));
 });
 
-// Make fatal reasons visible
-process.on('unhandledRejection', err => {
-  console.error('UNHANDLED REJECTION', err);
-  process.exit(1);
-});
-process.on('uncaughtException', err => {
-  console.error('UNCAUGHT EXCEPTION', err);
-  process.exit(1);
-});
+process.on('unhandledRejection', err => { console.error('UNHANDLED REJECTION', err); process.exit(1); });
+process.on('uncaughtException',  err => { console.error('UNCAUGHT EXCEPTION', err);  process.exit(1); });

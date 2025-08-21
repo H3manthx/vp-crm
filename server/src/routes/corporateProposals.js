@@ -1,12 +1,15 @@
-// server/src/routes/corporateProposals.js  (ESM)
-
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
-import { pool } from '../db/pool.js';
-import { authRequired, requireRole } from '../middleware/auth.js';
+
+// CJS interop
+import db from '../db/pool.js';
+const { pool } = db;
+
+import auth from '../middleware/auth.js';
+const { authRequired, requireRole } = auth;
 
 const router = express.Router();
 

@@ -1,7 +1,9 @@
-// server/src/routes/export.js  (ESM)
-import express from "express";
-import { pool } from "../db/pool.js";
-import ExcelJS from "exceljs";
+import express from 'express';
+import ExcelJS from 'exceljs';
+
+// CJS interop
+import db from '../db/pool.js';
+const { pool } = db;
 
 const router = express.Router();
 

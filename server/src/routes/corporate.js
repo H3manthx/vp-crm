@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { pool } from '../db/pool.js';
-import { authRequired, requireRole } from '../middleware/auth.js';
+
+// CJS interop: import default and destructure
+import db from '../db/pool.js';
+const { pool } = db;
+
+import auth from '../middleware/auth.js';
+const { authRequired, requireRole } = auth;
 
 export const corporateRouter = Router();
 
