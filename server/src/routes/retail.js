@@ -13,6 +13,10 @@ function getManagerDomain(role) {
   return null;
 }
 
+function sqlAnd(parts) {
+  return parts.filter(Boolean).join(' AND ');
+}
+
 /* -------------------------- CREATE RETAIL LEAD -------------------------- */
 
 retailRouter.post(
@@ -32,13 +36,17 @@ retailRouter.post(
         items = [],
       } = req.body || {};
 
+      // basic validation
       if (!name || !contact_number) {
-        return res.status(400).json({ error: 'name and contact_number are required' });
+        return res
+          .status(400)
+          .json({ error: 'name and contact_number are required' });
       }
       if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ error: 'at least one item is required' });
       }
 
+      // normalize items
       const normItems = items.map((it) => ({
         item_description: it.item_description ?? null,
         category: (it.category || '').toLowerCase(),
@@ -46,27 +54,48 @@ retailRouter.post(
         quantity: Number(it.quantity || 1),
       }));
 
+      // validate categories
       const allowed = new Set(['laptop', 'pc_component']);
       for (const it of normItems) {
         if (!allowed.has(it.category)) {
-          return res.status(400).json({ error: `invalid category: ${it.category}` });
+          return res
+            .status(400)
+            .json({ error: `invalid category: ${it.category}` });
         }
-        if (!it.brand) return res.status(400).json({ error: 'brand is required for each item' });
-        if (it.quantity < 1) return res.status(400).json({ error: 'quantity must be >= 1' });
+        if (!it.brand) {
+          return res
+            .status(400)
+            .json({ error: 'brand is required for each item' });
+        }
+        if (it.quantity < 1) {
+          return res
+            .status(400)
+            .json({ error: 'quantity must be >= 1' });
+        }
       }
 
+      // manager domain enforcement
       const role = req.user.role;
       const mgrDomain =
-        role === 'laptop_manager' ? 'laptop' : role === 'pc_manager' ? 'pc_component' : null;
+        role === 'laptop_manager'
+          ? 'laptop'
+          : role === 'pc_manager'
+          ? 'pc_component'
+          : null;
       if (mgrDomain) {
         const bad = normItems.find((it) => it.category !== mgrDomain);
-        if (bad) return res.status(400).json({ error: `managers can only create ${mgrDomain} leads` });
+        if (bad) {
+          return res
+            .status(400)
+            .json({ error: `managers can only create ${mgrDomain} leads` });
+        }
       }
 
       const created_by = req.user.user_id;
 
       await client.query('BEGIN');
 
+      // insert lead
       const leadSql = `
         INSERT INTO leads
           (store_id, name, contact_number, email, source, source_detail, created_by, status)
@@ -84,6 +113,7 @@ retailRouter.post(
       ]);
       const lead_id = leadRows[0].lead_id;
 
+      // insert items
       const itemSql = `
         INSERT INTO lead_items
           (lead_id, item_description, category, brand, quantity)
@@ -99,14 +129,13 @@ retailRouter.post(
         ]);
       }
 
-      await client.query(
-        `
+      // audit: initial status
+      const histSql = `
         INSERT INTO lead_status_history
           (lead_id, status, updated_by, notes)
         VALUES ($1,'New',$2,'Lead created')
-      `,
-        [lead_id, created_by]
-      );
+      `;
+      await client.query(histSql, [lead_id, created_by]);
 
       await client.query('COMMIT');
       res.json({ lead_id });
@@ -119,7 +148,7 @@ retailRouter.post(
   }
 );
 
-/* --------------------------- ASSIGN / TRANSFER --------------------------- */
+/* --------------------------- ASSIGN LEAD --------------------------- */
 
 retailRouter.post(
   '/leads/assign',
@@ -130,9 +159,12 @@ retailRouter.post(
     try {
       const { lead_id, assigned_to, transfer_reason = null } = req.body || {};
       if (!lead_id || !assigned_to) {
-        return res.status(400).json({ error: 'lead_id and assigned_to are required' });
+        return res
+          .status(400)
+          .json({ error: 'lead_id and assigned_to are required' });
       }
 
+      // enforce domain for the manager performing the action
       const dom =
         req.user.role === 'laptop_manager'
           ? 'laptop'
@@ -141,6 +173,7 @@ retailRouter.post(
           : null;
       if (!dom) return res.status(403).json({ error: 'Forbidden' });
 
+      // ensure lead's ALL items belong to manager's domain
       const domCheck = await pool.query(
         `SELECT EXISTS(
            SELECT 1
@@ -151,22 +184,28 @@ retailRouter.post(
         [Number(lead_id), dom]
       );
       if (domCheck.rows[0]?.has_other_domain) {
-        return res.status(403).json({ error: 'Lead has items outside your domain' });
+        return res
+          .status(403)
+          .json({ error: 'Lead has items outside your domain' });
       }
 
+      // read current state
       const { rows: L } = await pool.query(
         `SELECT lead_id, assigned_to FROM leads WHERE lead_id = $1`,
         [Number(lead_id)]
       );
       if (!L.length) return res.status(404).json({ error: 'Lead not found' });
 
-      const currentAssignee = L[0].assigned_to;
+      const currentAssignee = L[0].assigned_to; // may be null for unassigned
       const newAssignee = Number(assigned_to);
       const mgrId = req.user.user_id;
-      const isTransfer = currentAssignee != null && currentAssignee !== newAssignee;
+
+      const isTransfer =
+        currentAssignee != null && currentAssignee !== newAssignee;
 
       await client.query('BEGIN');
 
+      // update ownership on the lead
       await client.query(
         `UPDATE leads
            SET assigned_to = $1,
@@ -175,6 +214,7 @@ retailRouter.post(
         [newAssignee, mgrId, Number(lead_id)]
       );
 
+      // audit trail in status history
       const historyNote = isTransfer
         ? `Transferred from #${currentAssignee} to #${newAssignee}${
             transfer_reason ? ' — ' + transfer_reason : ''
@@ -187,12 +227,18 @@ retailRouter.post(
         [Number(lead_id), 'Assigned', mgrId, historyNote]
       );
 
+      // if this was a transfer, capture it in lead_transfers
       if (isTransfer) {
         await client.query(
           `INSERT INTO lead_transfers
              (lead_id, from_employee_id, to_employee_id, transfer_reason)
            VALUES ($1, $2, $3, $4)`,
-          [Number(lead_id), Number(currentAssignee), newAssignee, transfer_reason || null]
+          [
+            Number(lead_id),
+            Number(currentAssignee),
+            newAssignee,
+            transfer_reason || null,
+          ]
         );
       }
 
@@ -207,7 +253,7 @@ retailRouter.post(
   }
 );
 
-/* ------------------------------- LIST LEADS ------------------------------ */
+/* --------------------------- LIST LEADS --------------------------- */
 
 retailRouter.get('/leads', authRequired, async (req, res) => {
   try {
@@ -228,12 +274,22 @@ retailRouter.get('/leads', authRequired, async (req, res) => {
 
     const me = req.user.user_id;
 
-    const rAssignedTo = assigned_to === 'me' ? me : assigned_to ? Number(assigned_to) : null;
-    const rCreatedBy = created_by === 'me' ? me : created_by ? Number(created_by) : null;
-    const rAssignedBy = assigned_by === 'me' ? me : assigned_by ? Number(assigned_by) : null;
+    // Resolve “me” tokens
+    const rAssignedTo =
+      assigned_to === 'me' ? me : assigned_to ? Number(assigned_to) : null;
+    const rCreatedBy =
+      created_by === 'me' ? me : created_by ? Number(created_by) : null;
+    const rAssignedBy =
+      assigned_by === 'me' ? me : assigned_by ? Number(assigned_by) : null;
 
+    // If manager, auto-enforce domain from role unless explicitly asked (still same domain)
     const role = req.user.role;
-    const forcedDomain = role === 'laptop_manager' ? 'laptop' : role === 'pc_manager' ? 'pc_component' : null;
+    const forcedDomain =
+      role === 'laptop_manager'
+        ? 'laptop'
+        : role === 'pc_manager'
+        ? 'pc_component'
+        : null;
     const useDomain = domain || forcedDomain;
 
     const where = [];
@@ -241,10 +297,11 @@ retailRouter.get('/leads', authRequired, async (req, res) => {
     const p = (val) => {
       params.push(val);
       return `$${params.length}`;
-    };
+    }; // make placeholder and push value
 
+    // Filters
     if (rAssignedTo != null) where.push(`assigned_to = ${p(rAssignedTo)}`);
-    if (rCreatedBy != null) where.push(`created_by = ${p(rCreatedBy)}`);
+    if (rCreatedBy != null) where.push(`created_by  = ${p(rCreatedBy)}`);
     if (rAssignedBy != null) where.push(`assigned_by = ${p(rAssignedBy)}`);
 
     if (status) where.push(`status = ${p(status)}`);
@@ -253,7 +310,9 @@ retailRouter.get('/leads', authRequired, async (req, res) => {
     if (q) {
       const v = `%${q}%`;
       where.push(
-        `(name ILIKE ${p(v)} OR contact_number ILIKE ${p(v)} OR COALESCE(email,'') ILIKE ${p(v)})`
+        `(name ILIKE ${p(v)} OR contact_number ILIKE ${p(
+          v
+        )} OR COALESCE(email,'') ILIKE ${p(v)})`
       );
     }
 
@@ -262,6 +321,7 @@ retailRouter.get('/leads', authRequired, async (req, res) => {
 
     if (unassigned) where.push(`assigned_to IS NULL`);
 
+    // Domain: only leads whose ALL items are in the domain
     if (useDomain) {
       where.push(`
         NOT EXISTS (
@@ -271,6 +331,7 @@ retailRouter.get('/leads', authRequired, async (req, res) => {
       `);
     }
 
+    // Sales visibility guard
     if (role === 'sales') {
       const a = p(me),
         b = p(me);
@@ -279,16 +340,27 @@ retailRouter.get('/leads', authRequired, async (req, res) => {
 
     const whereSQL = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
+    // Total
     const totalSql = `SELECT COUNT(*)::int AS cnt FROM leads ${whereSQL};`;
-    const { rows: trows } = await pool.query(totalSql, params.slice()); // use a copy
+    const { rows: trows } = await pool.query(totalSql, params);
     const total = trows[0]?.cnt || 0;
 
+    // Data  **CHANGED: add active_hours using last status activity or enquiry_date**
     const dataSql = `
-      SELECT lead_id, store_id, name, contact_number, email, source, enquiry_date,
-             created_by, assigned_to, assigned_by, status, value_closed, closed_date
+      WITH last_update AS (
+        SELECT lead_id, MAX(update_timestamp) AS last_ts
+        FROM lead_status_history
+        GROUP BY lead_id
+      )
+      SELECT
+        leads.lead_id, leads.store_id, leads.name, leads.contact_number, leads.email, leads.source, leads.enquiry_date,
+        leads.created_by, leads.assigned_to, leads.assigned_by, leads.status, leads.value_closed, leads.closed_date,
+        FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(last_update.last_ts, leads.enquiry_date::timestamptz))) / 3600)::int
+          AS active_hours
       FROM leads
+      LEFT JOIN last_update ON last_update.lead_id = leads.lead_id
       ${whereSQL}
-      ORDER BY enquiry_date DESC, lead_id DESC
+      ORDER BY leads.enquiry_date DESC, leads.lead_id DESC
       LIMIT ${p(Number(limit))} OFFSET ${p(Number(offset))};
     `;
     const { rows } = await pool.query(dataSql, params);
@@ -299,30 +371,38 @@ retailRouter.get('/leads', authRequired, async (req, res) => {
   }
 });
 
-/* ---------------------------- LEAD + HISTORY ---------------------------- */
+/* --------------------------- LEAD DETAIL --------------------------- */
 
 retailRouter.get('/leads/:id', authRequired, async (req, res) => {
   try {
     const lead_id = Number(req.params.id);
-    const { rows: L } = await pool.query('SELECT * FROM leads WHERE lead_id=$1', [lead_id]);
+    const { rows: L } = await pool.query(
+      'SELECT * FROM leads WHERE lead_id=$1',
+      [lead_id]
+    );
     if (!L.length) return res.status(404).json({ error: 'Lead not found' });
     const lead = L[0];
 
+    // visibility
     const u = req.user;
     const isSalesOwn =
-      u.role === 'sales' && (lead.assigned_to === u.user_id || lead.created_by === u.user_id);
+      u.role === 'sales' &&
+      (lead.assigned_to === u.user_id || lead.created_by === u.user_id);
 
+    // manager domain guard: ALL items must be in manager's domain
     let domainOK = false;
     if (u.role === 'laptop_manager' || u.role === 'pc_manager') {
       const dom = u.role === 'laptop_manager' ? 'laptop' : 'pc_component';
-      const q = await pool.query('SELECT DISTINCT category FROM lead_items WHERE lead_id=$1', [
-        lead_id,
-      ]);
+      const q = await pool.query(
+        'SELECT DISTINCT category FROM lead_items WHERE lead_id=$1',
+        [lead_id]
+      );
       const cats = q.rows.map((r) => r.category);
       domainOK = cats.length === 0 || cats.every((c) => c === dom);
     }
 
-    if (!(isSalesOwn || domainOK)) return res.status(403).json({ error: 'Forbidden' });
+    if (!(isSalesOwn || domainOK))
+      return res.status(403).json({ error: 'Forbidden' });
 
     const { rows: items } = await pool.query(
       'SELECT * FROM lead_items WHERE lead_id=$1 ORDER BY lead_item_id ASC',
@@ -346,7 +426,6 @@ retailRouter.get('/leads/:id', authRequired, async (req, res) => {
 });
 
 /* --------------------------- ANALYTICS: STATUS -------------------------- */
-
 retailRouter.get('/analytics/status', authRequired, async (req, res) => {
   try {
     const scope = req.query.scope || 'me';
@@ -376,7 +455,6 @@ retailRouter.get('/analytics/status', authRequired, async (req, res) => {
 });
 
 /* ---------------------- ANALYTICS: TEAM WORKLOAD ----------------------- */
-
 retailRouter.get(
   '/analytics/team-workload',
   authRequired,
@@ -415,13 +493,13 @@ retailRouter.get(
 );
 
 /* ----------------------- ANALYTICS: PERFORMANCE ------------------------ */
-
 retailRouter.get('/analytics/performance', authRequired, async (req, res) => {
   try {
     const scope = req.query.scope || 'me';
     const period = (req.query.period || 'month').toLowerCase(); // month | quarter
     const me = req.user.user_id;
-    if (scope !== 'me') return res.status(400).json({ error: 'scope must be "me"' });
+    if (scope !== 'me')
+      return res.status(400).json({ error: 'scope must be "me"' });
 
     const frame = period === 'quarter' ? 'quarter' : 'month';
     const params = [me];
@@ -449,8 +527,7 @@ retailRouter.get('/analytics/performance', authRequired, async (req, res) => {
   }
 });
 
-/* --------------------------- REMINDERS (RETAIL) ------------------------- */
-
+/* --------------------------- RETAIL REMINDERS --------------------------- */
 retailRouter.get('/reminders/retail', authRequired, async (req, res) => {
   try {
     const scope = req.query.scope || 'me';
@@ -496,16 +573,17 @@ retailRouter.get('/reminders/retail', authRequired, async (req, res) => {
   }
 });
 
-/* -------------------- UPDATE STATUS (FIXED FOR ENUMS) ------------------- */
+/* --------------- Update lead status + history (FIXED) ---------------- */
 
 retailRouter.post('/leads/status', authRequired, async (req, res) => {
   try {
     const { lead_id, status, notes, value_closed } = req.body || {};
+
     if (!lead_id || !status) {
       return res.status(400).json({ error: 'lead_id and status are required' });
     }
 
-    // fetch lead (visibility checks)
+    // fetch lead (for visibility checks)
     const { rows: L } = await pool.query(
       'SELECT lead_id, assigned_to FROM leads WHERE lead_id = $1',
       [Number(lead_id)]
@@ -515,6 +593,7 @@ retailRouter.post('/leads/status', authRequired, async (req, res) => {
     const lead = L[0];
     const u = req.user;
 
+    // permission: sales => only their own; managers => only their domain
     if (u.role === 'sales' && lead.assigned_to !== u.user_id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
@@ -528,31 +607,35 @@ retailRouter.post('/leads/status', authRequired, async (req, res) => {
         [Number(lead_id), dom]
       );
       if (chk.rows[0]?.other_domain) {
-        return res.status(403).json({ error: 'Lead has items outside your domain' });
+        return res
+          .status(403)
+          .json({ error: 'Lead has items outside your domain' });
       }
     }
 
-    const tx = await pool.connect();
+    const client = await pool.connect();
     try {
-      await tx.query('BEGIN');
+      await client.query('BEGIN');
 
-      const isClosed = status === 'Closed Won' || status === 'Closed Lost';
-      const isClosedWon = status === 'Closed Won';
-      const vClosed = value_closed != null ? Number(value_closed) : null;
-
-      if (isClosed) {
-        await tx.query(
+      // update leads table
+      if (status === 'Closed Won' || status === 'Closed Lost') {
+        await client.query(
           `UPDATE leads
              SET status = $1,
                  closed_date = CURRENT_DATE,
-                 value_closed = CASE WHEN $3 THEN COALESCE($2, value_closed)
-                                     ELSE value_closed
-                                END
-           WHERE lead_id = $4`,
-          [status, vClosed, isClosedWon, Number(lead_id)]
+                 value_closed = CASE
+                   WHEN $1 = 'Closed Won' THEN COALESCE($3, value_closed)
+                   ELSE value_closed
+                 END
+           WHERE lead_id = $2`,
+          [
+            status,
+            Number(lead_id),
+            value_closed != null ? Number(value_closed) : null,
+          ]
         );
       } else {
-        await tx.query(
+        await client.query(
           `UPDATE leads
              SET status = $1
            WHERE lead_id = $2`,
@@ -560,27 +643,30 @@ retailRouter.post('/leads/status', authRequired, async (req, res) => {
         );
       }
 
-      await tx.query(
+      // add status history
+      await client.query(
         `INSERT INTO lead_status_history (lead_id, status, updated_by, notes)
          VALUES ($1, $2, $3, $4)`,
         [Number(lead_id), status, u.user_id, notes ?? null]
       );
 
-      await tx.query('COMMIT');
+      await client.query('COMMIT');
       res.json({ ok: true });
-    } catch (err) {
-      await tx.query('ROLLBACK');
-      console.error('status update error:', err);
-      res.status(400).json({ error: err.message || 'Failed to update status' });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      console.error('status update error:', e);
+      res
+        .status(400)
+        .json({ error: e.message || 'Failed to update status' });
     } finally {
-      tx.release();
+      client.release();
     }
   } catch (e) {
     res.status(400).json({ error: e.message || 'Bad request' });
   }
 });
 
-/* ------------------------------- TRANSFERS ------------------------------ */
+/* --------------------------- TRANSFER HISTORY --------------------------- */
 
 retailRouter.get(
   '/leads/:id/transfers',
