@@ -10,13 +10,39 @@ function fmtDate(iso) {
   const d = new Date(iso)
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
-function daysActiveSince(iso) {
-  if (!iso) return '—'
-  const start = new Date(iso).getTime()
-  const now = Date.now()
-  const days = Math.max(0, Math.floor((now - start) / (24 * 60 * 60 * 1000)))
-  return `${days} day${days === 1 ? '' : 's'}`
+
+// Pretty "X day(s), Y hour(s)" label.
+// Uses API fields active_days/active_hours_rem when present,
+// else falls back to active_hours or enquiry_date.
+function ageLabel(row) {
+  let days, remHours
+
+  if (
+    row &&
+    Number.isFinite(row.active_days) &&
+    Number.isFinite(row.active_hours_rem)
+  ) {
+    days = Math.max(0, Math.floor(row.active_days))
+    remHours = Math.max(0, Math.floor(row.active_hours_rem))
+  } else {
+    let hours
+    if (row && Number.isFinite(row.active_hours)) {
+      hours = Math.max(0, Math.floor(row.active_hours))
+    } else if (row?.enquiry_date) {
+      const ms = Date.now() - new Date(row.enquiry_date).getTime()
+      hours = Math.max(0, Math.floor(ms / 3600000))
+    } else {
+      return '—'
+    }
+    days = Math.floor(hours / 24)
+    remHours = hours % 24
+  }
+
+  const dPart = days > 0 ? `${days} day${days === 1 ? '' : 's'}` : ''
+  const hPart = `${remHours} hour${remHours === 1 ? '' : 's'}`
+  return dPart ? `${dPart}, ${hPart}` : hPart
 }
+
 const cap = (s='') => s ? s.charAt(0).toUpperCase() + s.slice(1) : s
 const catLabel = (c) => c === 'pc_component' ? 'PC Component' : cap(c)
 
@@ -44,7 +70,7 @@ export default function ManagerAssignedByMe() {
   const [history, setHistory] = useState([])
 
   // transfer overlay
-  const [showTransfer, setShowTransfer] = useState(false)
+  the [showTransfer, setShowTransfer] = useState(false)
   const [transferTo, setTransferTo] = useState('')
   const [transferReason, setTransferReason] = useState('')
   const transferSelectRef = useRef(null)
@@ -221,7 +247,7 @@ export default function ManagerAssignedByMe() {
                   Assigned to: <span className="font-medium">{assigneeName(r.assigned_to)}</span>
                 </div>
                 <div className="mt-1 text-sm text-gray-600">
-                  Active for {daysActiveSince(r.enquiry_date)}
+                  Active for {ageLabel(r)}
                 </div>
               </div>
               <div className="text-xs text-gray-500 whitespace-nowrap">
@@ -378,7 +404,7 @@ export default function ManagerAssignedByMe() {
                           <Calendar size={14} /> {detail.lead?.enquiry_date ? fmtDate(detail.lead.enquiry_date) : '—'}
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-700 px-2 py-0.5 text-xs">
-                          Active for {daysActiveSince(detail.lead?.enquiry_date)}
+                          Active for {ageLabel(detail.lead)}
                         </span>
                       </div>
                     </div>
