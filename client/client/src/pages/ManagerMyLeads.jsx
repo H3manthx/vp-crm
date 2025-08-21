@@ -17,13 +17,21 @@ function fmtDate(iso) {
     day: "numeric",
   });
 }
-function daysActiveSince(iso) {
+
+// NEW: show "Active for … hours". Uses server-provided active_hours when present,
+// otherwise falls back to computing from enquiry_date.
+function hoursActive(row) {
+  if (row && Number.isFinite(row.active_hours)) {
+    const h = Math.max(0, Math.floor(row.active_hours));
+    return `${h} hour${h === 1 ? "" : "s"}`;
+  }
+  const iso = row?.enquiry_date;
   if (!iso) return "—";
-  const start = new Date(iso).getTime();
-  const now = Date.now();
-  const days = Math.max(0, Math.floor((now - start) / (24 * 60 * 60 * 1000)));
-  return `${days} day${days === 1 ? "" : "s"}`;
+  const ms = Date.now() - new Date(iso).getTime();
+  const h = Math.max(0, Math.floor(ms / (60 * 60 * 1000)));
+  return `${h} hour${h === 1 ? "" : "s"}`;
 }
+
 const cap = (s = "") => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 const catLabel = (c) =>
   c === "pc_component" ? "PC Component" : cap((c || "").replace("_", " "));
@@ -176,7 +184,7 @@ export default function ManagerMyLeads() {
                 )}
 
                 <div className="mt-1 text-sm text-gray-600">
-                  Active for {daysActiveSince(r.enquiry_date)}
+                  Active for {hoursActive(r)}
                 </div>
               </div>
               <div className="text-xs text-gray-500 whitespace-nowrap">
@@ -348,7 +356,7 @@ export default function ManagerMyLeads() {
                     <Calendar size={14} /> {prettyDate ? fmtDate(prettyDate) : "—"}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-700 px-2 py-0.5 text-xs">
-                    Active for {daysActiveSince(openLead.enquiry_date)}
+                    Active for {hoursActive(openLead)}
                   </span>
                 </div>
               </div>
