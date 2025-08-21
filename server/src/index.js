@@ -17,7 +17,6 @@ app.set('trust proxy', 1);
 // ----- CORS first -----
 const corsMw = buildCors();
 app.use(corsMw);
-app.options('*', corsMw);
 
 // Common middleware
 app.use(express.json());
