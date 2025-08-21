@@ -345,7 +345,7 @@ retailRouter.get('/leads', authRequired, async (req, res) => {
     const { rows: trows } = await pool.query(totalSql, params);
     const total = trows[0]?.cnt || 0;
 
-    // Data  **CHANGED: add active_hours using last status activity or enquiry_date**
+    // Data  — add active_hours + (days, hours remainder)
     const dataSql = `
       WITH last_update AS (
         SELECT lead_id, MAX(update_timestamp) AS last_ts
@@ -356,7 +356,11 @@ retailRouter.get('/leads', authRequired, async (req, res) => {
         leads.lead_id, leads.store_id, leads.name, leads.contact_number, leads.email, leads.source, leads.enquiry_date,
         leads.created_by, leads.assigned_to, leads.assigned_by, leads.status, leads.value_closed, leads.closed_date,
         FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(last_update.last_ts, leads.enquiry_date::timestamptz))) / 3600)::int
-          AS active_hours
+          AS active_hours,
+        (FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(last_update.last_ts, leads.enquiry_date::timestamptz))) / 3600)::int / 24)::int
+          AS active_days,
+        (FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(last_update.last_ts, leads.enquiry_date::timestamptz))) / 3600)::int % 24)::int
+          AS active_hours_rem
       FROM leads
       LEFT JOIN last_update ON last_update.lead_id = leads.lead_id
       ${whereSQL}

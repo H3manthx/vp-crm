@@ -18,18 +18,37 @@ function fmtDate(iso) {
   });
 }
 
-// NEW: show "Active for … hours". Uses server-provided active_hours when present,
-// otherwise falls back to computing from enquiry_date.
-function hoursActive(row) {
-  if (row && Number.isFinite(row.active_hours)) {
-    const h = Math.max(0, Math.floor(row.active_hours));
-    return `${h} hour${h === 1 ? "" : "s"}`;
+// Pretty "X day(s), Y hour(s)" label.
+// Uses API fields active_days/active_hours_rem when available,
+// otherwise falls back to active_hours or enquiry_date.
+function ageLabel(row) {
+  let days, remHours;
+
+  if (
+    row &&
+    Number.isFinite(row.active_days) &&
+    Number.isFinite(row.active_hours_rem)
+  ) {
+    days = Math.max(0, Math.floor(row.active_days));
+    remHours = Math.max(0, Math.floor(row.active_hours_rem));
+  } else {
+    let hours;
+    if (row && Number.isFinite(row.active_hours)) {
+      hours = Math.max(0, Math.floor(row.active_hours));
+    } else if (row?.enquiry_date) {
+      const ms = Date.now() - new Date(row.enquiry_date).getTime();
+      hours = Math.max(0, Math.floor(ms / 3600000));
+    } else {
+      return "—";
+    }
+    days = Math.floor(hours / 24);
+    remHours = hours % 24;
   }
-  const iso = row?.enquiry_date;
-  if (!iso) return "—";
-  const ms = Date.now() - new Date(iso).getTime();
-  const h = Math.max(0, Math.floor(ms / (60 * 60 * 1000)));
-  return `${h} hour${h === 1 ? "" : "s"}`;
+
+  const dPart = days > 0 ? `${days} day${days === 1 ? "" : "s"}` : "";
+  const hPart = `${remHours} hour${remHours === 1 ? "" : "s"}`;
+
+  return dPart ? `${dPart}, ${hPart}` : hPart;
 }
 
 const cap = (s = "") => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -184,7 +203,7 @@ export default function ManagerMyLeads() {
                 )}
 
                 <div className="mt-1 text-sm text-gray-600">
-                  Active for {hoursActive(r)}
+                  Active for {ageLabel(r)}
                 </div>
               </div>
               <div className="text-xs text-gray-500 whitespace-nowrap">
@@ -356,7 +375,7 @@ export default function ManagerMyLeads() {
                     <Calendar size={14} /> {prettyDate ? fmtDate(prettyDate) : "—"}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-700 px-2 py-0.5 text-xs">
-                    Active for {hoursActive(openLead)}
+                    Active for {ageLabel(openLead)}
                   </span>
                 </div>
               </div>
