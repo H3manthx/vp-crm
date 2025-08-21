@@ -18,7 +18,6 @@ app.set('trust proxy', 1);
 const corsMw = buildCors();
 app.use(corsMw);
 // Express 5: don't use "*" — use a real pattern or omit this line
-app.options('/(.*)', corsMw);
 
 // Common middleware
 app.use(express.json());
