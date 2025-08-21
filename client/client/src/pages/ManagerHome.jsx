@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Plus, Users, ClipboardList, BarChart3, Power, Download } from 'lucide-react';
 
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, ''); // e.g. https://vp-crm-...run.app/api
+
 export default function ManagerHome() {
   const { user, logout } = useAuth();
 
@@ -39,9 +41,9 @@ export default function ManagerHome() {
           <Card to="/mgr/my-leads"       icon={<ClipboardList size={18} />} title="My Leads"              desc="Leads you’re personally handling." />
           <Card to="/mgr/performance"    icon={<BarChart3 size={18} />}     title="Performance"           desc="Status mix and team overview." />
 
-          {/* Export Leads (direct download) */}
+          {/* Export Leads (direct download from API origin) */}
           <CardAnchor
-            href="/api/mgr/export"
+            href={`${API_BASE}/mgr/export`}
             icon={<Download size={18} />}
             title="Export Leads"
             desc="Download all leads as Excel."
@@ -76,8 +78,7 @@ function CardAnchor({ href, icon, title, desc }) {
     <a
       href={href}
       className="block rounded-2xl border bg-white/90 backdrop-blur p-5 shadow hover:shadow-lg transition"
-      // target="_self" keeps it in the same tab; change to "_blank" if you prefer
-      target="_self"
+      target="_blank"     /* keep SPA open; downloads in new tab */
       rel="noopener"
     >
       <div className="flex items-start gap-4">
