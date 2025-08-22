@@ -51,6 +51,34 @@ function ageLabel(row) {
   return dPart ? `${dPart}, ${hPart}` : hPart;
 }
 
+// NEW: unified label — shows "Lead closed in …" for closed leads, else "Active for …"
+function timelineLabel(row) {
+  if (!row) return "—";
+  const s = (row.status || "").toLowerCase();
+  const isClosed =
+    s === "closed won" || s === "closed lost" || !!row.closed_date;
+
+  const fmtDur = (totalHours) => {
+    const total = Math.max(0, Math.floor(totalHours));
+    const days = Math.floor(total / 24);
+    const hours = total % 24;
+    const dPart = days > 0 ? `${days} day${days === 1 ? "" : "s"}` : "";
+    const hPart = `${hours} hour${hours === 1 ? "" : "s"}`;
+    return dPart ? `${dPart}, ${hPart}` : hPart;
+  };
+
+  if (isClosed) {
+    const start = row.enquiry_date ? new Date(row.enquiry_date).getTime() : null;
+    const end = row.closed_date ? new Date(row.closed_date).getTime() : null;
+    if (start == null || end == null || end < start) return "Lead closed";
+    const hours = (end - start) / 3600000;
+    return `Lead closed in ${fmtDur(hours)}`;
+  }
+
+  // still open
+  return `Active for ${ageLabel(row)}`;
+}
+
 const cap = (s = "") => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 const catLabel = (c) =>
   c === "pc_component" ? "PC Component" : cap((c || "").replace("_", " "));
@@ -214,7 +242,7 @@ export default function ManagerMyLeads() {
                 )}
 
                 <div className="mt-1 text-sm text-gray-600">
-                  Active for {ageLabel(r)}
+                  {timelineLabel(r)}
                 </div>
               </div>
               <div className="text-xs text-gray-500 whitespace-nowrap">
@@ -388,7 +416,7 @@ export default function ManagerMyLeads() {
                     <Calendar size={14} /> {prettyDate ? fmtDate(prettyDate) : "—"}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-700 px-2 py-0.5 text-xs">
-                    Active for {ageLabel(openLead)}
+                    {timelineLabel(detail?.lead ?? openLead)}
                   </span>
                 </div>
               </div>
