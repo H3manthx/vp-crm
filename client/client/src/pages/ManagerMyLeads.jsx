@@ -21,20 +21,32 @@ function fmtDate(iso) {
 // Pretty "X day(s), Y hour(s)" label.
 // Uses API fields active_days/active_hours_rem when available,
 // otherwise falls back to active_hours or enquiry_date.
-function ageLabel(row) {
+// Supports a fallback row (e.g., the list row) that carries those fields.
+function ageLabel(row, fallback) {
   let days, remHours;
 
-  if (
-    row &&
-    Number.isFinite(row.active_days) &&
-    Number.isFinite(row.active_hours_rem)
-  ) {
-    days = Math.max(0, Math.floor(row.active_days));
-    remHours = Math.max(0, Math.floor(row.active_hours_rem));
+  const has = (v) => Number.isFinite(v);
+
+  const ad =
+    (row && has(row.active_days) ? row.active_days : undefined) ??
+    (fallback && has(fallback.active_days) ? fallback.active_days : undefined);
+
+  const ahr =
+    (row && has(row.active_hours_rem) ? row.active_hours_rem : undefined) ??
+    (fallback && has(fallback.active_hours_rem) ? fallback.active_hours_rem : undefined);
+
+  if (has(ad) && has(ahr)) {
+    days = Math.max(0, Math.floor(ad));
+    remHours = Math.max(0, Math.floor(ahr));
   } else {
     let hours;
-    if (row && Number.isFinite(row.active_hours)) {
-      hours = Math.max(0, Math.floor(row.active_hours));
+
+    const ah =
+      (row && has(row.active_hours) ? row.active_hours : undefined) ??
+      (fallback && has(fallback.active_hours) ? fallback.active_hours : undefined);
+
+    if (has(ah)) {
+      hours = Math.max(0, Math.floor(ah));
     } else if (row?.enquiry_date) {
       const ms = Date.now() - new Date(row.enquiry_date).getTime();
       hours = Math.max(0, Math.floor(ms / 3600000));
@@ -52,7 +64,8 @@ function ageLabel(row) {
 }
 
 // NEW: unified label — shows "Lead closed in …" for closed leads, else "Active for …"
-function timelineLabel(row) {
+// Accepts a fallback row to source active_* fields when the detail row lacks them.
+function timelineLabel(row, fallback) {
   if (!row) return "—";
   const s = (row.status || "").toLowerCase();
   const isClosed =
@@ -75,8 +88,8 @@ function timelineLabel(row) {
     return `Lead closed in ${fmtDur(hours)}`;
   }
 
-  // still open
-  return `Active for ${ageLabel(row)}`;
+  // still open — prefer active_* from the fallback (list row) if detail lacks them
+  return `Active for ${ageLabel(row, fallback)}`;
 }
 
 const cap = (s = "") => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -416,7 +429,7 @@ export default function ManagerMyLeads() {
                     <Calendar size={14} /> {prettyDate ? fmtDate(prettyDate) : "—"}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-700 px-2 py-0.5 text-xs">
-                    {timelineLabel(detail?.lead ?? openLead)}
+                    {timelineLabel(detail?.lead ?? openLead, openLead)}
                   </span>
                 </div>
               </div>
