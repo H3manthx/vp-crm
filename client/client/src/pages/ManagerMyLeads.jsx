@@ -136,8 +136,7 @@ export default function ManagerMyLeads() {
     for (const lead of filtered) {
       if (!lead.enquiry_date) continue;
       const d = new Date(lead.enquiry_date);
-      theMonthStart = new Date(d.getFullYear(), d.getMonth(), 1);
-      const monthStart = theMonthStart; // (no behavior change)
+      const monthStart = new Date(d.getFullYear(), d.getMonth(), 1); // FIXED
       const key = monthStart.toISOString().slice(0, 10);
       if (!map.has(key)) {
         const label = monthStart.toLocaleDateString(undefined, {
