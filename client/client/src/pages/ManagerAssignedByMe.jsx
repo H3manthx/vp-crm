@@ -43,7 +43,7 @@ function ageLabel(row) {
   return dPart ? `${dPart}, ${hPart}` : hPart
 }
 
-// NEW: unified label — shows "Lead closed in …" for closed leads, else "Active for …"
+// Shows "Lead closed in …" for closed leads, else "Active for …"
 function timelineLabel(row) {
   if (!row) return '—'
   const s = (row.status || '').toLowerCase()
@@ -66,7 +66,6 @@ function timelineLabel(row) {
     return `Lead closed in ${fmtDur(hours)}`
   }
 
-  // still open
   return `Active for ${ageLabel(row)}`
 }
 
@@ -96,7 +95,7 @@ export default function ManagerAssignedByMe() {
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState([])
 
-  // transfer overlay (FIXED: removed stray 'the')
+  // transfer overlay
   const [showTransfer, setShowTransfer] = useState(false)
   const [transferTo, setTransferTo] = useState('')
   const [transferReason, setTransferReason] = useState('')
@@ -316,7 +315,7 @@ export default function ManagerAssignedByMe() {
             value={q}
             onChange={(e)=>setQ(e.target.value)}
             placeholder="Search by name or #id…"
-            className="w/full md:w-80 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+            className="w-full md:w-80 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
           />
           <div className="flex items-center gap-2 flex-wrap">
             <select
@@ -444,37 +443,37 @@ export default function ManagerAssignedByMe() {
                     </div>
                     <div>
                       <label className="text-sm text-gray-500">Enquiry date</label>
-                      <input className="mt-1 w/full rounded-xl border px-3 py-2 bg-white" value={detail.lead?.enquiry_date ? fmtDate(detail.lead.enquiry_date) : '—'} readOnly />
+                      <input className="mt-1 w-full rounded-xl border px-3 py-2 bg-white" value={detail.lead?.enquiry_date ? fmtDate(detail.lead.enquiry_date) : '—'} readOnly />
                     </div>
                     <div>
                       <label className="text-sm text-gray-500">Product type</label>
-                      <input className="mt-1 w/full rounded-xl border px-3 py-2 bg-white" value={catLabel(detail.items?.[0]?.category)} readOnly />
+                      <input className="mt-1 w-full rounded-xl border px-3 py-2 bg-white" value={catLabel(detail.items?.[0]?.category)} readOnly />
                     </div>
                     <div>
                       <label className="text-sm text-gray-500">Brand</label>
-                      <input className="mt-1 w/full rounded-xl border px-3 py-2 bg-white" value={detail.items?.[0]?.brand || ''} readOnly />
+                      <input className="mt-1 w-full rounded-xl border px-3 py-2 bg-white" value={detail.items?.[0]?.brand || ''} readOnly />
                     </div>
                     <div className="md:col-span-2">
                       <label className="text-sm text-gray-500">Product details</label>
-                      <textarea className="mt-1 w/full rounded-xl border px-3 py-2 bg-white" rows={3} value={detail.items?.[0]?.item_description || ''} readOnly />
+                      <textarea className="mt-1 w-full rounded-xl border px-3 py-2 bg-white" rows={3} value={detail.items?.[0]?.item_description || ''} readOnly />
                     </div>
                     {detail.lead?.status === 'Closed Won' && (
                       <div>
                         <label className="text-sm text-gray-500">Lead value</label>
-                        <input className="mt-1 w/full rounded-xl border px-3 py-2 font-semibold bg-white" value={Number(detail.lead?.value_closed || 0).toLocaleString()} readOnly />
+                        <input className="mt-1 w-full rounded-xl border px-3 py-2 font-semibold bg-white" value={Number(detail.lead?.value_closed || 0).toLocaleString()} readOnly />
                       </div>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md/grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <button
-                      className="w/full px-4 py-2 rounded-lg border hover:bg-gray-50"
+                      className="w-full px-4 py-2 rounded-lg border hover:bg-gray-50"
                       onClick={() => setShowHistory(true)}
                     >
                       View status history
                     </button>
                     <button
-                      className="w/full px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                      className="w-full px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
                       onClick={() => setShowTransfer(true)}
                     >
                       Transfer lead
@@ -490,7 +489,7 @@ export default function ManagerAssignedByMe() {
             <>
               <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm" onClick={() => setShowTransfer(false)} />
               <div className="fixed inset-0 z-[61] flex items-center justify-center p-4">
-                <div className="w/full max-w-xl rounded-2xl bg-white border shadow-2xl p-5 relative">
+                <div className="w-full max-w-xl rounded-2xl bg-white border shadow-2xl p-5 relative">
                   <button
                     onClick={() => setShowTransfer(false)}
                     className="absolute right-4 top-4 rounded-full border w-9 h-9 inline-flex items-center justify-center hover:bg-gray-50"
@@ -508,7 +507,7 @@ export default function ManagerAssignedByMe() {
                       <label className="block text-sm text-gray-600 mb-1">Transfer to</label>
                       <select
                         ref={transferSelectRef}
-                        className="w/full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-200"
+                        className="w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-200"
                         value={transferTo}
                         onChange={(e)=>setTransferTo(e.target.value)}
                       >
@@ -525,7 +524,7 @@ export default function ManagerAssignedByMe() {
                       <label className="block text-sm text-gray-600 mb-1">Reason (optional)</label>
                       <textarea
                         rows={3}
-                        className="w/full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-200"
+                        className="w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-200"
                         placeholder="Why are you transferring this lead?"
                         value={transferReason}
                         onChange={(e)=>setTransferReason(e.target.value)}
