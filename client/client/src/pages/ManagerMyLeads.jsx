@@ -65,6 +65,7 @@ export default function ManagerMyLeads() {
 
   const [openLead, setOpenLead] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false); // NEW
   const [history, setHistory] = useState([]);
   const [showStatus, setShowStatus] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -130,13 +131,18 @@ export default function ManagerMyLeads() {
   // ----- open modal (fetch detail + history) -----
   const openLeadModal = async (lead) => {
     setOpenLead(lead);
+    setDetail(null);
+    setHistory([]);
+    setDetailLoading(true);
     try {
       const r = await api.get(`/retail/leads/${lead.lead_id}`);
       setDetail(r.data || {});
       setHistory(r.data?.history || []);
     } catch {
-      setDetail(null);
+      setDetail({ error: "Failed to fetch lead" });
       setHistory([]);
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -145,11 +151,16 @@ export default function ManagerMyLeads() {
     if (openLead) {
       const fresh = rows.find((r) => r.lead_id === openLead.lead_id) || openLead;
       setOpenLead(fresh);
+      setDetailLoading(true);
       try {
         const r = await api.get(`/retail/leads/${fresh.lead_id}`);
         setDetail(r.data || {});
         setHistory(r.data?.history || []);
-      } catch {}
+      } catch {
+        // ignore
+      } finally {
+        setDetailLoading(false);
+      }
     }
   };
 
@@ -383,56 +394,68 @@ export default function ManagerMyLeads() {
               </div>
             </div>
 
-            {/* fields */}
-            {(() => {
-              const lead = detail?.lead ?? openLead;
-              const it = detail?.items?.[0] || {};
-              return (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm text-gray-500">Customer name</label>
-                    <input
-                      className="mt-1 w-full rounded-xl border px-3 py-2 bg-white"
-                      readOnly
-                      value={lead?.name || ""}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-500">Enquiry date</label>
-                    <input
-                      className="mt-1 w-full rounded-xl border px-3 py-2 bg-white"
-                      readOnly
-                      value={prettyDate ? fmtDate(prettyDate) : "—"}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-500">Product type</label>
-                    <input
-                      className="mt-1 w-full rounded-xl border px-3 py-2 bg-white"
-                      readOnly
-                      value={catLabel(it.category || lead?.category)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-500">Brand</label>
-                    <input
-                      className="mt-1 w-full rounded-xl border px-3 py-2 bg-white"
-                      readOnly
-                      value={it.brand || ""}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-sm text-gray-500">Product details</label>
-                    <textarea
-                      rows={3}
-                      className="mt-1 w-full rounded-xl border px-3 py-2 bg-white"
-                      readOnly
-                      value={it.item_description || ""}
-                    />
-                  </div>
+            {/* detail states + fields (mirror Assigned-by-me) */}
+            {detailLoading && <div className="text-gray-600">Loading…</div>}
+
+            {!detailLoading && detail?.error && (
+              <div className="rounded-lg border bg-red-50 text-red-700 px-3 py-2">{detail.error}</div>
+            )}
+
+            {!detailLoading && detail && !detail.error && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-gray-500">Customer name</label>
+                  <input
+                    className="mt-1 w-full rounded-xl border px-3 py-2 bg-white"
+                    readOnly
+                    value={detail.lead?.name || ""}
+                  />
                 </div>
-              );
-            })()}
+                <div>
+                  <label className="text-sm text-gray-500">Enquiry date</label>
+                  <input
+                    className="mt-1 w-full rounded-xl border px-3 py-2 bg-white"
+                    readOnly
+                    value={detail.lead?.enquiry_date ? fmtDate(detail.lead.enquiry_date) : "—"}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-500">Product type</label>
+                  <input
+                    className="mt-1 w-full rounded-xl border px-3 py-2 bg-white"
+                    readOnly
+                    value={catLabel(detail.items?.[0]?.category)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-500">Brand</label>
+                  <input
+                    className="mt-1 w-full rounded-xl border px-3 py-2 bg-white"
+                    readOnly
+                    value={detail.items?.[0]?.brand || ""}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-500">Product details</label>
+                  <textarea
+                    rows={3}
+                    className="mt-1 w-full rounded-xl border px-3 py-2 bg-white"
+                    readOnly
+                    value={detail.items?.[0]?.item_description || ""}
+                  />
+                </div>
+                {detail.lead?.status === "Closed Won" && (
+                  <div>
+                    <label className="text-sm text-gray-500">Lead value</label>
+                    <input
+                      className="mt-1 w-full rounded-xl border px-3 py-2 font-semibold bg-white"
+                      readOnly
+                      value={Number(detail.lead?.value_closed || 0).toLocaleString()}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* actions */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
