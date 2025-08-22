@@ -621,22 +621,22 @@ retailRouter.post('/leads/status', authRequired, async (req, res) => {
     try {
       await client.query('BEGIN');
 
-      // update leads table
-      if (status === 'Closed Won' || status === 'Closed Lost') {
+      // --- ONLY CHANGE BELOW: avoid comparing $1 to a text literal ---
+      const isClosedWon = status === 'Closed Won';
+      const isClosed = isClosedWon || status === 'Closed Lost';
+      const vClosed = value_closed != null ? Number(value_closed) : null;
+
+      if (isClosed) {
         await client.query(
           `UPDATE leads
              SET status = $1,
                  closed_date = CURRENT_DATE,
                  value_closed = CASE
-                   WHEN $1 = 'Closed Won' THEN COALESCE($3, value_closed)
+                   WHEN $3 THEN COALESCE($2, value_closed)
                    ELSE value_closed
                  END
-           WHERE lead_id = $2`,
-          [
-            status,
-            Number(lead_id),
-            value_closed != null ? Number(value_closed) : null,
-          ]
+           WHERE lead_id = $4`,
+          [status, vClosed, isClosedWon, Number(lead_id)]
         );
       } else {
         await client.query(
