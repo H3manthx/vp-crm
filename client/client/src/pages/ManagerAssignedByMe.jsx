@@ -257,6 +257,12 @@ export default function ManagerAssignedByMe() {
   const total = rows.length
   const shown = filtered.length
 
+  // Row from the list for the currently open lead (has active_* fields)
+  const openRow = useMemo(
+    () => rows.find(r => r.lead_id === openId) || null,
+    [rows, openId]
+  )
+
   function LeadCard({ r }) {
     return (
       <button
@@ -430,7 +436,7 @@ export default function ManagerAssignedByMe() {
                           <Calendar size={14} /> {detail.lead?.enquiry_date ? fmtDate(detail.lead.enquiry_date) : '—'}
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-700 px-2 py-0.5 text-xs">
-                          {timelineLabel(detail.lead)}
+                          {timelineLabel(openRow || detail.lead)}
                         </span>
                       </div>
                     </div>
