@@ -190,7 +190,7 @@ export default function CreateLeadForm({ onSuccess }) {
               onChange={e => setEmail(e.target.value)}
             />
 
-            {/* SOURCE: changed to dropdown (keeps icon + styling) */}
+            {/* SOURCE: dropdown with chevron */}
             <div>
               <div className="relative">
                 <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -199,7 +199,7 @@ export default function CreateLeadForm({ onSuccess }) {
                 <select
                   value={source}
                   onChange={e => setSource(e.target.value)}
-                  className="w-full rounded-xl border pl-10 pr-3 py-3 outline-none focus:ring-2 focus:ring-indigo-200 bg-white text-gray-700"
+                  className="w-full rounded-xl border pl-10 pr-10 py-3 outline-none focus:ring-2 focus:ring-indigo-200 bg-white text-gray-700 appearance-none"
                 >
                   <option value="">Source (e.g., Walk-in, Online)</option>
                   <option value="Walk-in">Walk-in</option>
@@ -208,6 +208,9 @@ export default function CreateLeadForm({ onSuccess }) {
                   <option value="Phone">Phone</option>
                   <option value="Other">Other</option>
                 </select>
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <ChevronDown size={16} />
+                </div>
               </div>
             </div>
 
