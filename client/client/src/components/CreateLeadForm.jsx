@@ -189,12 +189,28 @@ export default function CreateLeadForm({ onSuccess }) {
               value={email}
               onChange={e => setEmail(e.target.value)}
             />
-            <Input
-              icon={<Tag size={16} />}
-              placeholder="Source (e.g., Walk-in, Online)"
-              value={source}
-              onChange={e => setSource(e.target.value)}
-            />
+
+            {/* SOURCE: changed to dropdown (keeps icon + styling) */}
+            <div>
+              <div className="relative">
+                <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <Tag size={16} />
+                </div>
+                <select
+                  value={source}
+                  onChange={e => setSource(e.target.value)}
+                  className="w-full rounded-xl border pl-10 pr-3 py-3 outline-none focus:ring-2 focus:ring-indigo-200 bg-white text-gray-700"
+                >
+                  <option value="">Source (e.g., Walk-in, Online)</option>
+                  <option value="Walk-in">Walk-in</option>
+                  <option value="Online">Online</option>
+                  <option value="Referral">Referral</option>
+                  <option value="Phone">Phone</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
             <Input
               icon={<Info size={16} />}
               placeholder="Source info / details"
