@@ -190,28 +190,21 @@ export default function CreateLeadForm({ onSuccess }) {
               onChange={e => setEmail(e.target.value)}
             />
 
-            {/* SOURCE: dropdown with chevron */}
+            {/* SOURCE — mirror other dropdowns (Brand/Category style) */}
             <div>
-              <div className="relative">
-                <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  <Tag size={16} />
-                </div>
-                <select
-                  value={source}
-                  onChange={e => setSource(e.target.value)}
-                  className="w-full rounded-xl border pl-10 pr-10 py-3 outline-none focus:ring-2 focus:ring-indigo-200 bg-white text-gray-700 appearance-none"
-                >
-                  <option value="">Source (e.g., Walk-in, Online)</option>
-                  <option value="Walk-in">Walk-in</option>
-                  <option value="Online">Online</option>
-                  <option value="Referral">Referral</option>
-                  <option value="Phone">Phone</option>
-                  <option value="Other">Other</option>
-                </select>
-                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  <ChevronDown size={16} />
-                </div>
-              </div>
+              <label className="block text-sm text-gray-600 mb-1">Source</label>
+              <select
+                value={source}
+                onChange={e => setSource(e.target.value)}
+                className="w-full rounded-xl border px-3 py-3 outline-none focus:ring-2 focus:ring-indigo-200"
+              >
+                <option value="">Select source</option>
+                <option value="Walk-in">Walk-in</option>
+                <option value="Online">Online</option>
+                <option value="Referral">Referral</option>
+                <option value="Phone">Phone</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
 
             <Input
@@ -381,7 +374,7 @@ function StoreSelect({ value, options, onChange }) {
   const [open, setOpen] = useState(false)
   const btnRef = useRef(null)
 
-  // IMPORTANT FIX: do NOT default to options[0]; we want placeholder until the user picks one.
+  // IMPORTANT: do NOT default to options[0]; keep placeholder until the user picks one.
   const selected = options.find(o => String(o.id) === String(value)) || null
 
   return (
