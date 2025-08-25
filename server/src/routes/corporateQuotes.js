@@ -44,28 +44,22 @@ corporateQuotesRouter.post('/', async (req, res) => {
   }
 });
 
-// GET /api/corporate/leads/quotes/:leadId (ownership enforced)
-corporateQuotesRouter.get(
-  '/:leadId',
-  authRequired,
-  requireRole('corporate_manager'),
-  async (req, res) => {
-    try {
-      const { rows } = await pool.query(
-        `SELECT q.quote_id, q.corporate_lead_id, q.amount, q.notes, q.created_at
-         FROM corporate_lead_quotes q
-         JOIN corporate_leads l ON l.corporate_lead_id = q.corporate_lead_id
-         WHERE q.corporate_lead_id = $1
-           AND l.manager_id = $2
-         ORDER BY q.created_at DESC`,
-        [req.params.leadId, req.user.user_id]
-      );
-      res.json(rows);
-    } catch (err) {
-      console.error('list quotes error', err);
-      res.status(500).json({ error: 'Failed to load quotes' });
-    }
+// GET /api/corporate/leads/quotes/:leadId
+// List all quotes for a lead (newest first)
+corporateQuotesRouter.get('/:leadId', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT quote_id, corporate_lead_id, amount, notes, created_at
+       FROM corporate_lead_quotes
+       WHERE corporate_lead_id = $1
+       ORDER BY created_at DESC`,
+      [req.params.leadId]
+    );
+    res.json(r.rows);
+  } catch (err) {
+    console.error('list quotes error', err);
+    res.status(500).json({ error: 'Failed to load quotes' });
   }
-);
+});
 
 module.exports = { corporateQuotesRouter };
