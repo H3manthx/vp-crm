@@ -38,8 +38,12 @@ export default function CreateLeadForm({ onSuccess }) {
   ]
 
   const brandOptions = [
-    'Lenovo', 'Dell', 'HP', 'Acer', 'Asus', 'MSI', 'Apple',
-    'AMD', 'Intel', 'NVIDIA', 'Gigabyte', 'ASRock', 'Corsair', 'Kingston', 'Crucial', 'Samsung',
+    'Lenovo', 'Dell', 'HP', 'Acer', 'Asus', 'MSI', 'Apple', 
+    'Microsoft', 'Samsung', 'LG', 'Sony', 'Toshiba', 
+    'Corsair', 'EVGA', 'Zotac', 'Cooler Master', 
+    'Seagate', 'Western Digital', 'Crucial', 'G.Skill', 'HyperX', 
+    'Logitech', 'Razer', 'Alienware',
+    'AMD', 'Intel', 'NVIDIA', 'Gigabyte', 'ASRock', 'Kingston', 
     'Other'
   ]
 

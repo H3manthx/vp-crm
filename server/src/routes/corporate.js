@@ -116,9 +116,9 @@ corporateRouter.get(
     try {
       const { q, status, limit = 20, offset = 0 } = req.query;
 
-      const where = [];
-      const params = [];
-      let i = 1;
+      const where = ['manager_id = $1'];        // <— own leads only
+      const params = [req.user.user_id];
+      let i = 2;
 
       if (status) {
         where.push(`status = $${i++}`);
@@ -134,7 +134,7 @@ corporateRouter.get(
         i++;
       }
 
-      const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+      const whereSql = `WHERE ${where.join(' AND ')}`;
 
       const countSql = `SELECT COUNT(*)::int AS total FROM corporate_leads ${whereSql}`;
       const { rows: cRows } = await pool.query(countSql, params);
@@ -338,7 +338,7 @@ corporateRouter.post(
   }
 );
 
-// History
+// History (ownership enforced)
 corporateRouter.get(
   '/leads/history/:leadId',
   authRequired,
@@ -358,11 +358,13 @@ corporateRouter.get(
                h.update_timestamp,
                e.name AS updated_by_name
         FROM corporate_lead_status_history h
+        JOIN corporate_leads l ON l.corporate_lead_id = h.corporate_lead_id
         LEFT JOIN employees e ON e.employee_id = h.updated_by
         WHERE h.corporate_lead_id = $1
+          AND l.manager_id = $2
         ORDER BY h.update_timestamp DESC
       `;
-      const { rows } = await pool.query(sql, [id]);
+      const { rows } = await pool.query(sql, [id, req.user.user_id]);
       res.json(rows);
     } catch (e) {
       res.status(500).json({ error: 'Failed to load history' });
@@ -370,7 +372,7 @@ corporateRouter.get(
   }
 );
 
-// One lead + items
+// One lead + items (ownership enforced)
 corporateRouter.get(
   '/leads/:leadId',
   authRequired,
@@ -385,8 +387,8 @@ corporateRouter.get(
         `SELECT corporate_lead_id, name, contact_number, email, status, enquiry_date,
                 last_quoted_value, last_quoted_at, manager_id
          FROM corporate_leads
-         WHERE corporate_lead_id = $1`,
-        [id]
+         WHERE corporate_lead_id = $1 AND manager_id = $2`,
+        [id, req.user.user_id]
       );
       if (!rows.length) return res.status(404).json({ error: 'Lead not found' });
 
