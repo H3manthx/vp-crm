@@ -229,7 +229,7 @@ export default function CorporateLeads() {
                     {openLead.status || "New"}
                   </span>
                   <span className="inline-flex items-center gap-1">
-                    <Calendar size={14} /> {openLead.enquiry_date ? formatDateTime(openLead.enquiry_date) : "—"}
+                    <Calendar size={14} /> {openLead.enquiry_date ? formatDate(openLead.enquiry_date) : "—"}
                   </span>
                 </div>
               </div>
