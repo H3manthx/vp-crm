@@ -4,7 +4,7 @@
 
 @layer base {
   *, *::before, *::after {
-    @apply transition-all duration-300 ease-in-out;
+    @apply transition-colors transition-opacity transition-shadow transition-transform duration-300 ease-in-out;
   }
 }
 
