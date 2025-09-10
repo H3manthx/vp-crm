@@ -7,7 +7,7 @@ import CorporateStatusModal from "../components/CorporateStatusModal";
 import CorporateHistoryModal from "../components/CorporateHistoryModal";
 import CorporateQuotesModal from "../components/CorporateQuotesModal";
 import CorporateProposalsModal from "../components/CorporateProposalsModal";
-import { formatDateTime } from "../utils/dates";
+import { formatDateTime, formatDate } from "../utils/dates";
 import { Calendar, Mail, Phone, Package2 } from "lucide-react";
 
 export default function CorporateLeads() {
@@ -95,14 +95,14 @@ export default function CorporateLeads() {
       try {
         const h = await api.get(`/corporate/leads/history/${fresh.corporate_lead_id}`);
         setHistory(h.data || []);
-      } catch {}
+      } catch {
+        // ignore errors when refreshing history
+      }
     }
   };
 
   const resetFilters = () => { setQ(""); setStatus(""); setSort("newest"); };
 
-  const initial = (openLead?.name || "L").trim()[0]?.toUpperCase?.() || "L";
-  const prettyDate = openLead?.enquiry_date ? formatDateTime(openLead.enquiry_date) : "—";
   const items = Array.isArray(openLead?.items) ? openLead.items : [];
 
   function LeadCard({ r }) {
@@ -120,7 +120,7 @@ export default function CorporateLeads() {
             </div>
           </div>
           <div className="text-xs text-gray-500 text-right whitespace-nowrap">
-            {r.enquiry_date ? new Date(r.enquiry_date).toLocaleDateString() : "—"}
+            {r.enquiry_date ? formatDateTime(r.enquiry_date) : "—"}
           </div>
         </div>
       </button>
